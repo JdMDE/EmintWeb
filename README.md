@@ -1,14 +1,14 @@
 # EmintWeb
 A framework for the development of embedded interactive web applications
 
-This program is still in a preliminary version and has been tested only in Linux.
+This program is still in a preliminary version and has been tested only in Linux (Fedora 38 and Ubuntu).
 
-It depends on third-party libraries, concretely the gumbo HTML5 parser (package gumbo-parser-devel in Fedora).
+It depends on third-party libraries, concretely the gumbo HTML5 parser (package gumbo-parser-devel in Fedora and libgumbo-dev in Ubuntu).
+Also, some Qt modules must be installed (look for the package names in your distribution attending to the compilation errors).
 
 EimitWeb is a framework that generates and compiles C++ code. The framework itself does not depend on anything else except gumbo but the generated code uses several of the Poco libraries (concretely: libPocoNet, libPocoUtil, libPocoFoundation and libPocoNetSSL) as long as libpthread so you will have to install them to compile and run the generated applications. 
 
 To compile EmintWeb, first execute qmake-qt5 -o Makefile EmIntWeb.pro.
-In Linux, it might be convenient to execute qmake-qt5 -spec /usr/lib64/qt5/mkspecs/linux-g++-64 -o Makefile EmIntWeb.pro depending on your distribution.
 
 This will create file Makefile.
 
