@@ -1,0 +1,74 @@
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+<xsd:simpleType name="boolvalue">
+	<xsd:restriction base="xsd:string">
+		<xsd:pattern value="true|false"/>
+	</xsd:restriction>
+</xsd:simpleType>
+
+<xsd:simpleType name="STypes">
+	<xsd:restriction base="xsd:string">
+		<xsd:pattern value="Initial|Intermediate|Terminal"/>
+	</xsd:restriction>
+</xsd:simpleType>
+
+<xsd:element name="Project">
+	<xsd:complexType>
+		<xsd:sequence>
+				<xsd:element name="ProjectName" type="xsd:string"/>
+				<xsd:element name="HTTPSMode" type="boolvalue" minOccurs="0"/>
+				<xsd:element name="Comments" type="xsd:string" minOccurs="0"/>
+				<xsd:element name="States" type="StateList" minOccurs="0"/>
+				<xsd:element name="Transitions" type="TransitionList" minOccurs="0"/>
+		</xsd:sequence>
+	</xsd:complexType>
+</xsd:element>
+
+<xsd:complexType name="StateList">
+	<xsd:sequence>
+		<xsd:element name="State" type="StateType" minOccurs="1" maxOccurs="unbounded"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="TransitionList">
+	<xsd:sequence>
+		<xsd:element name="Transition" type="TransitionType" minOccurs="1" maxOccurs="unbounded"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="StateNameList">
+	<xsd:sequence>
+		<xsd:element name="StateName" type="xsd:string" minOccurs="1" maxOccurs="unbounded"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="StateType">
+	<xsd:sequence>
+		<xsd:element name="StateName" type="xsd:string"/>
+		<xsd:element name="HTMLFile" type="xsd:string"/>
+		<xsd:element name="StatePosition" type="Position"/>
+		<xsd:element name="StateType" type="STypes"/>
+		<xsd:element name="StateComments" type="xsd:string" minOccurs="0"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="TransitionType">
+	<xsd:sequence>
+		<xsd:element name="TransitionName" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+		<xsd:element name="InitialStateName" type="xsd:string"/>
+		<xsd:element name="FallbackStateName" type="xsd:string"/>
+		<xsd:element name="FinalStateNames" type="StateNameList"/>
+		<xsd:element name="TransitionPosition" type="Position" minOccurs="0"/>
+		<xsd:element name="CodeFile" type="xsd:string"/>
+		<xsd:element name="TransitionComments" type="xsd:string" minOccurs="0"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="Position">
+	<xsd:sequence>
+		<xsd:element name="x" type="xsd:integer"/>
+		<xsd:element name="y" type="xsd:integer"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+</xsd:schema>

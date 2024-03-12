@@ -1,0 +1,7 @@
+#!/bin/bash
+make install
+echo "Copying skeletons, cursors and xsd files to /usr/share/emintweb..."
+install -D --mode=0644 --owner=root --target-directory=/usr/share/emintweb skeletons/*
+install -D --mode=0644 --owner=root --target-directory=/usr/share/emintweb/cursors cursors/*
+install -D --mode=0644 --owner=root --target-directory=/usr/share/emintweb xsd/*
+

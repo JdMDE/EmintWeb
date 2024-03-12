@@ -1,0 +1,26 @@
+#ifndef TOSTRING_H
+#define TOSTRING_H
+
+#include <string>
+#include <sstream>
+
+using namespace std;
+
+//! A function to convert any type of variable to a string
+/*!
+   This function is needed to convert variables so that its value can be put in the attributes or content of a HTML5 node
+
+   \param c Any variable to be converted to a string
+   \return The value of the variable as a string
+*/
+template <typename T>
+string tostring(T c)
+{
+ ostringstream o;
+ o << c;
+ return(o.str());
+}
+
+#endif
+
+

@@ -1,0 +1,229 @@
+/*
+    The class to contain any HTML tag
+    Copyright (C) 2013  Juan Domingo Esteve <Juan.Domingo@uv.es>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+#ifndef TAG_H
+#define TAG_H
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cstdlib>
+
+#include "taglabeldefs.h"
+
+using namespace std;
+
+//! Namespace to keep internal objects isolated from their outer wrappers.
+/*! This namespace is to keep the real objects, those for which memory is really allocated and deallocated, isolated from the wrappers.
+    The trick is booking memory, and filling the object (any node in the HTML5 tree) just once and keep a pointer to it. When the object
+    is to be copied or assigned, are the wrappers (see later class Tag) which are assigned and then only the internal pointer is copied.<br>
+    This is really fast but it needs a mechanism to control referencing and deallocation: each internal object holds a counter indicating how
+    many external objects are really referring to it, either directly or because its wrapper was copied or assigned, so this counter is increased
+    into the wrapper copy constructor and assignment operator. Deletion of a wrapper object, either by direct use of delete or when the
+    object goes out of scope, decreases the counter. Only when the counter reaches 0 the internal object is finally deallocated.<br>
+    This mechanism also elliminates the need of garbage collector: no garbage is never generated since objects don't take memory unless a
+    new instance is created and the memory is deallocated as soon as it is not needed any more.
+*/
+namespace internal
+{
+ //! Class to hold a real (internal) HTML5 tag
+ class r_Tag
+ {
+  public:
+   //! Default constructor
+   /*!
+       \param label The HTML5 name of the tag. Attributes are left empty
+   */
+   r_Tag(string label);
+
+   //! Constructor with two argument to create a node with attributes
+   /*!
+       \param label The HTML5 name of the tag
+       \param attributes The attributes of the node as a string formed by pairs att=value
+   */
+   r_Tag(string label, string attributes);
+
+   //! The copy constructor. Only the internal pointers are copied so it is very fast
+   /*!
+       \param other A reference to the r_Tag to be copied
+   */
+   r_Tag(r_Tag &other);
+
+   //! Destructor. It deallocates the memory used by this node only if no one else points to it.
+   ~r_Tag();
+
+   //! Assignment operator. Only the internal pointers are assigned so it is very fast
+   r_Tag & operator=(r_Tag &other);
+
+   //! Equality test. Internal pointers are compared. 
+   bool operator==(r_Tag &other);
+
+   //! Function to get the string containing the attributes of this node
+   /*!
+       \return A string with the attributes
+   */
+   string getattributes() { return tagattributes; };
+
+   //! Function to set the string containing the attributes of this node
+   /*!
+       \param attributes The new attributes to be stored
+   */
+   void setattributes(string attributes) { tagattributes=attributes; };
+
+   //! Function to set the content of a node, assuming it can hold such a thing.
+   /*!
+       Content of a node is usually the text that goes between the opening and closing: <tag> Content </tag>. Any string is allowed.
+
+       \param content The content to be put into the node
+   */
+   void setcontent(string content);
+
+   //! Function to add a node as a sibling of the current one
+   /*!
+       \param other The pointer to the r_Tag (node) that will be the last (up to now) sibling of this node
+   */
+   void add(r_Tag *other);
+
+   //! Increments the internal counter that knows how many external objects (wrappers) point to us
+   void incopm();
+
+   //! Decrements the internal counter that knows how many external objects (wrappers) point to us
+   void decopm();
+
+   //! Returns the internal counter that knows how many external objects (wrappers) point to us
+   /*!
+       \return The number of external objects (wrappers) currently pointing to us
+   */
+   int getopm() { return numopm; };
+
+   //! Returns a string with the piece of HTML5 that this node generates (i.e.: serializes the node)
+   /*!
+       \param basicident The unit of indentation that will be added to the current indentation
+       \param ident The current indentation. This, plus the basicindent, will be the current level passed to avary child node.
+       \return The string generated by this node of the DOM tree (including all its descendants)
+   */
+   string generate( string basicident, string ident );
+
+   //! Deallocates the memory booked at construction and pointed by the internal pointer.
+   void cleanmem();
+   
+ private:
+   string taglabel;                         //!< The label (tag) of this node; it must be a legal HTML5 tag
+   string tagattributes;                    //!< The string of attributes of this node
+   vector<r_Tag *> tagsiblings;             //!< A vector of pointers to all the siblings. Order matters (the HTML5 code will be generated in vector order)
+   int numopm;                              //!< The counter that holds the number of wrappers that are pointing to us
+   bool istext;                             //!< A flag to indicate if this is a text node. Text nodes are like any other, but the taglabel is used to store the content.<br>It was easier than creation of a special class for text nodes, specially because only one type of pointer is needed
+   //! Function to set the flag when this node is to be a text node
+   /*!
+       \param t true is this node is a text node, false otherwise.
+   */
+   void settext(bool t) { istext = t; };    
+ };
+};
+
+//! The visible class to manipulate the HTML5 tags (nodes)
+/*! This class is mainly a wrapper of the class internal::r_Tag built to accelerate the copy and assignation of nodes that using this mechanism gets reduced to a pointer assignation
+*/
+class Tag
+{
+ public:
+  //! Simplest constructor with the tag and no attributes
+  /*! 
+      \param tag The HTML5 name of the tag. Attributes are left empty
+  */
+  Tag(string tag);
+
+  //! Constructor with tag and attributes
+  /*! 
+      \param tag The HTML5 name of the tag.
+      \param attributes The attributes of the node
+  */
+  Tag(string tag, string attributes);
+  
+  //! Constructor with tag, attributes and content
+  /*! 
+      \param tag The HTML5 name of the tag.
+      \param attributes The attributes of the node
+      \param content The content that will be copied verbatim between the opening and closing of the tag
+  */
+  Tag(string tag, string attributes, string content);
+
+  //! Copy constructor
+  /*! 
+      \param other A reference to other Tag object to be copied. The constructor makes smart copy (only internal pointers are assigned)
+  */
+  Tag(Tag &other);
+  
+  //! Destructor
+  /*! This is also a smart destructor. It frees the internal pointer memory only if no one else points to it
+  */
+  ~Tag();
+  
+  //! Assignment operator. Like the copy constructor, it makes smart assignment (only internal pointers are assigned)
+  /*! Like the copy constructor, it makes smart assignment (only internal pointers are assigned)
+      \param other A reference to other Tag object to be assigned
+  */
+  Tag &operator=(Tag &other);
+
+  //! Equality test. Internal pointers are compared.
+  bool operator==(Tag &other);
+  
+  //! Sets the attributes of the tag to any string
+  /*!
+      \param attributes The new attributes to be stored
+  */ 
+  void SetAttributes(string attributes) { p->setattributes(attributes); };
+
+  //! Function to get the string containing the attributes of this node
+  /*!
+       \return A string with the attributes
+  */
+  string GetAttributes() { return p->getattributes(); };
+  
+  //! Function to set the content of a node, assuming it can hold such a thing.
+  /*!
+      Content of a node is usually the text that goes between the opening and closing: <tag> Content </tag>. Any string is allowed.
+
+      \param content The content to be put into the node
+  */
+  void SetContent(string content) { p->setcontent(content); };
+  
+  //! Function to add a node as a sibling of the current one
+  /*!
+      \param other The pointer to the Tag (node) that will be the last (up to now) sibling of this node
+  */
+  void add(Tag &other);
+  
+  //! Function to generate the piece of HTML5 code corresponding to this node with all its siblings
+  /*!
+      \param ident The unit of indentation added to each level
+  */
+  string Generate(string ident) { return p->generate(ident,ident); };
+
+ protected:
+  //! Function to return the pointer to the internal object this class is a wrapper to
+  /*! It is protected since it is only called by the Tag::add function of this class so the internal pointer is sufficiently isolated
+
+      \return The pointer to the internal::r_Tag object
+  */
+  internal::r_Tag *GetP() { return p; };
+  
+ private:
+  internal::r_Tag *p;   //!< The pointer to the internal object of the internal::r_Tag class of which this class is a wrapper
+};
+
+#endif // TAG_H

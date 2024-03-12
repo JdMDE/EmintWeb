@@ -1,0 +1,62 @@
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+<xsd:simpleType name="boolvalue">
+	<xsd:restriction base="xsd:string">
+		<xsd:pattern value="true|false"/>
+	</xsd:restriction>
+</xsd:simpleType>
+
+<xsd:complexType name="SSLEnumFiles">
+	<xsd:sequence>
+		<xsd:element name="PEMFile" type="xsd:string" minOccurs="1" maxOccurs="1"/>
+		<xsd:element name="PEMKey" type="xsd:string" minOccurs="1" maxOccurs="1"/>
+		<xsd:element name="RSAKeySize" type="xsd:nonNegativeInteger" minOccurs="0" maxOccurs="1"/>
+		<xsd:element name="DHFile" type="xsd:string" minOccurs="1" maxOccurs="1"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="SourceList">
+	<xsd:sequence minOccurs="0">
+		<xsd:element name="Source" type="xsd:string" minOccurs="1" maxOccurs="unbounded"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="IncludeDirList">
+	<xsd:sequence minOccurs="0">
+		<xsd:element name="IncludeDir" type="xsd:string" minOccurs="1" maxOccurs="unbounded"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="LibDirList">
+	<xsd:sequence minOccurs="0">
+		<xsd:element name="LibDir" type="xsd:string" minOccurs="1" maxOccurs="unbounded"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="LibList">
+	<xsd:sequence minOccurs="0">
+		<xsd:element name="Library" type="xsd:string" minOccurs="1" maxOccurs="unbounded"/>
+	</xsd:sequence>
+</xsd:complexType>
+
+<xsd:element name="ProjectLocalConf">
+        <xsd:complexType>
+			<xsd:sequence>
+			<xsd:element name="ProjectName" type="xsd:string"/>
+			<xsd:element name="HTTPSMode" type="boolvalue"/>
+			<xsd:element name="ProjectDir" type="xsd:string"/>
+			<xsd:element name="HTMLSubDir" type="xsd:string"/>
+			<xsd:element name="CodeSubDir" type="xsd:string"/>
+			<xsd:element name="ServerDebugFlag" type="boolvalue"/>
+			<xsd:element name="CPPCompiler" type="xsd:string"/>
+			<xsd:element name="CompilerFlags" type="xsd:string" minOccurs="0"/>
+			<xsd:element name="AdditionalSources" type="SourceList" minOccurs="0"/>
+			<xsd:element name="AdditionalIncludeDirs" type="IncludeDirList" minOccurs="0"/>
+			<xsd:element name="AdditionalLibDirs" type="LibDirList" minOccurs="0"/>
+			<xsd:element name="AdditionalLibraries" type="LibList" minOccurs="0"/>
+			<xsd:element name="SSLKeyFiles" type="SSLEnumFiles" minOccurs="0"/>
+                </xsd:sequence>
+        </xsd:complexType>
+</xsd:element>
+
+</xsd:schema>
