@@ -36,7 +36,12 @@ int CreationDialog::Launch()
 QList<QString> CreationDialog::CSVToList(QString s)
 {
  QRegExp r("[\\s\\t,]+");
- QStringList l=s.split(r,Qt::SkipEmptyParts);
+ QStringList l;
+ #if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
+  l=s.split(r,Qt::SkipEmptyParts);
+ #else
+  l=s.split(r,QString::SkipEmptyParts);
+ #endif
  QList<QString> ret;
  for (int i=0;i<l.size();i++)
   if ( (l[i] != QString("")) && (l[i][0] != QChar('-')) )
