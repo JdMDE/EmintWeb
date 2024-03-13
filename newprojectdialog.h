@@ -70,7 +70,7 @@ class NewProjectDialog : public CreationDialog
   // Additional libraries
   QLineEdit *eAddLibraries;
   
-  void AlterProjectContent(QString pfile,bool kill_st_tr);
+  bool AlterProjectContent(QString pfile,bool kill_st_tr);
 };
 
 #endif // NEWPROJECTDIALOG_H
