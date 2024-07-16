@@ -3,7 +3,7 @@ A framework for the development of embedded interactive web applications
 
 This project is described in a paper published in SoftwareX: 
 
-"EmintWeb: Creation of embedded web applications in C++ for specific systems",
+"EmintWeb: Creation of embedded web applications in C++ for specific systems",<br />
 Domingo, J.; Panach, I.; Dura, E.
 
 which is available in open access:
