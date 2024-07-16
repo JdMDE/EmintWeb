@@ -10,6 +10,10 @@ which is available in open access:
 
 https://www.sciencedirect.com/science/article/pii/S2352711024001808
 
+A video to explain what is EmintWeb and that builds this example step by step is available in
+
+https://johnford.uv.es/EmintWeb/
+
 This program is still in a preliminary version and has been tested only in Linux (Fedora 38, Ubuntu and ArchLinux).
 
 It depends on third-party libraries, concretely Qt5, the gumbo HTML5 parser (package gumbo-parser-devel in Fedora,
