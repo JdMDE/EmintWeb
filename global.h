@@ -145,11 +145,14 @@ using namespace std;
 #define DEFAULT_PTHREAD		  QString("pthread")
 
 #define MAIN_SKMB                 QString("main_skeleton_before")+DEFAULT_CPP_EXTENSION;
+#define MAIN_SKTB                 QString("thread_skeleton_before")+DEFAULT_CPP_EXTENSION;
 #define MAIN_SKMA                 QString("main_skeleton_after")+DEFAULT_CPP_EXTENSION;
 #define MAIN_SKTA                 QString("main_skeleton_thread_after")+DEFAULT_CPP_EXTENSION;
 #define MAIN_SERVERCALL		  QString("main_skeleton_servercall")+DEFAULT_CPP_EXTENSION;
 #define MAIN_SERVER		  QString("main_skeleton_server")+DEFAULT_CPP_EXTENSION;
-
+#define COMMONHEADER_1		  QString("commonheader_skeleton_1")+DEFAULT_HEADER_EXTENSION;
+#define COMMONHEADER_2		  QString("commonheader_skeleton_2")+DEFAULT_HEADER_EXTENSION;
+#define MAINHEADER		  QString("mainheader_skeleton")+DEFAULT_HEADER_EXTENSION;
 //#define COM_MAIN_COMMAND    QString("g++ -Wall -");
 
 enum StateType { Initial, Terminal, Intermediate, NO_TYPE };

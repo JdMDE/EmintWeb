@@ -195,4 +195,39 @@ void SendFile(string path,string mimetype,size_t filelength,unsigned short port,
  delete[] buf;
 }
 
+int main(int argc, char* argv[])
+{
+ if (argc<2)
+ {
+  cerr << "Usage: " << argv[0] << " <server_port> [other_arguments]" << endl;
+  exit(1);
+ }
+ 
+ unsigned short port=atoi(argv[1]);
+ if ((port<IPPORT_RESERVED+1) || (port>std::numeric_limits<unsigned short>::max()-1))
+ {
+  cerr << "Error: port must be between " << IPPORT_RESERVED+1 << " and " << std::numeric_limits<unsigned short>::max()-1 << endl;
+  exit(1);
+ }
+ 
+ Context theContext;
+ bool retsetargs;
+ if (argc>2)
+  retsetargs=theContext.SetArgs(argc-2,argv+2);
+ else
+  retsetargs=theContext.SetArgs(0,NULL);
+ if (!retsetargs)
+ {
+  cerr << "Error in Context.SetArgs. Check your additions to that function.\n";
+  exit(1);;
+ };
+ theContext.InitializeContext();
+ if (theContext.GetError()!=NO_ERROR)
+ {
+  cerr << "Error in Context.InitializeContext(). Check your addtions to that function,\n";
+  cerr << "Returned error is " << theContext.ReadableError() << endl;
+  exit(1);
+ }
+ 
+
 

@@ -1515,6 +1515,21 @@ QString Project::FileAsQString(QString fname)
  return ret;
 }
 
+void Project::InsertFileWithSubsts(ofstream &f,QString fname,QStringList to_search,QStringList to_replace)
+{
+ ifstream g;
+ if (!OpenToRead(fname,g))
+  return;
+ 
+ QString fst=FileAsQString(fname);
+ 
+ for (QStringList::iterator it1=to_search.begin(),it2=to_replace.begin(); it1<to_search.end(); ++it1,++it2)
+  fst.replace(*it1,*it2);
+
+ f << fst.toStdString(); 
+}
+
+
 bool Project::HasContent(QString r)
 {
  if (r.isEmpty())
@@ -1526,9 +1541,28 @@ bool Project::HasContent(QString r)
  return (i<r.length());
 }
 
+void Project::ExitIfNotAccessible(QString fname)
+{
+ if (!FileAccessible(fname))
+ {
+  QVector<QString> e;
+  e.push_back(tr("The skeleton file %1 does not exists. Please, install the emintweb program correctly"));
+  e.push_back(fname);
+  ErrWarn(true,e);
+  exit(1);
+ }
+}
+
 // This functions generates the Project.h that will be included by Project.cpp and by Project_Call.cpp
 void Project::GenCommonHeader(QString MainHeader,QString inith)
 { 
+ // First, check that the two skeletons needed in this function exist
+ QString skh1=INST_DIR+COMMONHEADER_1
+ ExitIfNotAccessible(skh1);
+ 
+ QString skh2=INST_DIR+COMMONHEADER_2
+ ExitIfNotAccessible(skh2);
+ 
  // Writing the header file P.h that will be used by both, the single-instance main and the called-by-thread pseudo-main.
  ofstream fh;
  if (!OpenToWrite(MainHeader,fh))
@@ -1536,9 +1570,6 @@ void Project::GenCommonHeader(QString MainHeader,QString inith)
   
  fh << "#ifndef " << GetName().toStdString() << "_H\n";
  fh << "#define " << GetName().toStdString() << "_H\n\n";
- // This has been moved from here to context.h, which allows it to be used by the transition files.
- // This is to control the emission of messages inside transitions
- // fh << "#define SERVERDEB " << ((GetServerDebFlag()==true) ? "true" : "false") << endl << endl;
  
  fh << "#ifdef SECURE_HTTP\n";
  fh << "#define PEM_FILE   \"" << GetPEMFile().toStdString() << "\"" << endl;
@@ -1547,51 +1578,9 @@ void Project::GenCommonHeader(QString MainHeader,QString inith)
  fh << "#define DH_FILE    \"" << GetDHFile().toStdString() << "\"" << endl;
  fh << "#endif\n\n";
  
- // This could be changed with a project option, as we do for the SERVERDEB flag, but it's no worth, probably....
- fh << "#define SEND_AUTOMATIC_REDIRECTION_IN_SERVER false\n";
- // The same happens with this. Its normal value should be true but now we are doing automatic tests with JMeter...
- fh << "// Change ALLOW_PORT_REUSE to true for common use; to make automatic tests (for example, with JMeter) we prefer false\n";
- fh << "#define ALLOW_PORT_REUSE false\n\n";
- fh << "#include <iostream>\n";
- fh << "#include <fstream>\n";
- fh << "#include <string>\n";
- fh << "#include <sstream>\n";
- fh << "#include <cstdlib>\n";
- fh << "#include <limits>\n";
- fh << "#include <map>\n\n";
+ InsertFile(fh,skh1);
 
- fh << "using namespace std;\n\n";
-
- fh << "#include <Poco/Exception.h>\n";
- fh << "#include <Poco/Net/MessageHeader.h>\n";
- fh << "#include <Poco/Net/HTTPRequest.h>\n";
- fh << "#include <Poco/Net/HTTPResponse.h>\n";
- fh << "#include <Poco/Net/HTMLForm.h>\n\n";
-
- fh << "#ifdef SECURE_HTTP\n";
- fh << "#include <Poco/Net/SecureStreamSocket.h>\n";
- fh << "#include <Poco/Net/SecureServerSocket.h>\n";
- fh << "#else\n";
- fh << "#include <Poco/Net/StreamSocket.h>\n";
- fh << "#include <Poco/Net/ServerSocket.h>\n";
- fh << "#endif\n";
- fh << "#include <Poco/Timespan.h>\n";
- fh << "#include <Poco/Net/DNS.h>\n\n";
-
- fh << "enum ServerErrors {\n";
- fh << " Bind=1,\n";
- fh << " Listen=2,\n";
- fh << " AcceptCon=3,\n";
- fh << " ChangeAddr=4,\n";
- fh << " Send=5,\n";
- fh << " Receive=6\n";
- fh << "};\n\n";
-
- fh << "#include <html5document.h>\n";
  fh << "#include \"context" << DEFAULT_HEADER_EXTENSION.toStdString() << "\"\n\n";
-
- fh << "// The size of the chunk to send files\n";
- fh << "#define FILE_BUF_SIZE   128\n\n";
 
  inith.replace(DEFAULT_CPP_EXTENSION,DEFAULT_HEADER_EXTENSION);
  QString inithtrim=NameWithoutPath(inith);
@@ -1606,56 +1595,33 @@ void Project::GenCommonHeader(QString MainHeader,QString inith)
  }
  fh << endl;
 
- fh << "// Prototypes for the defined functions\n\n";
-
- fh << "void AnnounceError(ServerErrors error_type,string err_desc,unsigned short port,ostream &errst,int len,int exp_len);\n";
- fh << "string Terminal_transition(Poco::Net::NameValueCollection &FormWithIVars,string &next_st,Context &usercontext);\n";
- fh << "#ifdef SECURE_HTTP\n";
- fh << "Poco::Net::Context::Ptr PrepareSSLContext(pthread_t *pthread_id,ostream &errst);\n";
- fh << "void SendPage(string page,unsigned short port,Poco::Net::SecureStreamSocket &sts,ostream &errst);\n";
- fh << "void SendFile(string path,string mimetype,size_t filelength,unsigned short port,Poco::Net::SecureStreamSocket &sts,ostream &errst);\n";
- fh << "#else\n";
- fh << "void SendPage(string page,unsigned short port,Poco::Net::StreamSocket &sts,ostream &errst);\n";
- fh << "void SendFile(string path,string mimetype,size_t filelength,unsigned short port,Poco::Net::StreamSocket &sts,ostream &errst);\n";
- fh << "#endif\n";
-
+ InsertFile(fh,skh2);
+ 
  fh << "#endif\n\n";
+
  fh.close();
 }
 
 
 void Project::GenMainHeaderCall(QString MainHeaderCall)
 {
+ // First, check that the keleton needed in this function exists
+ QString skh=INST_DIR+MAINHEADER;
+ ExitIfNotAccessible(skh);
+ 
  // Writing the header file that will be used only by the server multithreaded main. It has essentially the thread arguments and prototype of the thread call.
  ofstream fhc;
  if (!OpenToWrite(MainHeaderCall,fhc))
   return;
 
- fhc << "#ifndef " << GetName().toStdString() << "_CALL_H\n";
- fhc << "#define " << GetName().toStdString() << "_CALL_H\n\n";
-
- fhc << "#include <mutex>\n";
- fhc << "#include <sys/wait.h>\n";
- fhc << "#include <sys/ipc.h>\n";
- fhc << "#include <sys/shm.h>\n\n";
-
- fhc << "// Inactivity time in seconds just before start and at any other time\n";
- fhc << "#define INACTIVITY_FIRST_WAIT_TIME 15\n";
- fhc << "#define INACTIVITY_NORMAL_WAIT_TIME 360\n\n";
+ QStringList l1,l2;
+ l1.push_back("$PROJECT_NAME");
+ l2.push_back(GetName());
+ l1.push_back("$PRNAME_WITH_EXT");
+ l2.push_back(GetName()+DEFAULT_HEADER_EXTENSION);
  
- fhc << "#include \"" << GetName().toStdString() << DEFAULT_HEADER_EXTENSION.toStdString() << "\"\n\n";
-
- fhc << "typedef struct\n{\n int newargc;\n int sharedmem_id;\n\n unsigned short port;\n unsigned short initial_port;\n unsigned short port_range;\n\n char **newargv;\n}\nargs_to_main;\n\n";
+ InsertFileWithSubsts(fhc,skh,l1,l2);
  
- fhc << "void LeaveThreadCorrectly(pthread_mutex_t only_mutex,bool *used_ports,unsigned short place,ostream &errst);\n";
- fhc << "string NameOfDebFile(unsigned short port);\n\n";
-
- fhc << "// Prototype of the thread to launch each instance. To be passed as argument to pthread_create\n";
- fhc << "void *" << GetName().toStdString() << "Call(void *);\n\n";
- 
- fhc << "extern pthread_mutex_t only_mutex;\n\n";
- 
- fhc << "#endif\n";
  fhc.close();
 }
 
@@ -1667,201 +1633,60 @@ void Project::GenSingleMainAndThreadHeaders(QString MainHeader,QString MainHeade
 
 void Project::GenSingleMainAndThreadBodies(QString MainSource,QString MainSourceCall,QString inith)
 {
- // First, check that the three skeletons needed in this function exist
- QString skb=INST_DIR+MAIN_SKMB;
- if (!FileAccessible(skb))
- {
-  QVector<QString> e;
-  e.push_back(tr("The skeleton file %1 does not exists. Please, install the emintweb program correctly"));
-  e.push_back(skb);
-  ErrWarn(true,e);
-  exit(1);
- }
+ // First, check that the fourskeletons needed in this function exist
+ QString skmb=INST_DIR+MAIN_SKMB;
+ ExitIfNotAccessible(skmb);
+ 
  QString ska=INST_DIR+MAIN_SKMA;
- if (!FileAccessible(ska))
- {
-  QVector<QString> e;
-  e.push_back(tr("The skeleton file %1 does not exists. Please, install the emintweb program correctly"));
-  e.push_back(ska);
-  ErrWarn(true,e);
-  exit(1);
- }
+ ExitIfNotAccessible(ska);
+ 
+ QString sktb=INST_DIR+MAIN_SKTB;
+ ExitIfNotAccessible(sktb);
+ 
  QString skta=INST_DIR+MAIN_SKTA;
- if (!FileAccessible(skta))
- {
-  QVector<QString> e;
-  e.push_back(tr("The skeleton file %1 does not exists. Please, install the emintweb program correctly"));
-  e.push_back(skta);
-  ErrWarn(true,e);
-  exit(1);
- }
+ ExitIfNotAccessible(skta);
  
  // Now, the main files for both cases will be written simultaneously, since they are very similar
  ofstream fc;
  if (!OpenToWrite(MainSource,fc))
   return;
- fc  << "#include \"" << GetName().toStdString() << DEFAULT_HEADER_EXTENSION.toStdString() << "\"\n\n";
- 
  ofstream fcc;
  if (!OpenToWrite(MainSourceCall,fcc))
   return;
+  
+ fc  << "#include \"" << GetName().toStdString() << DEFAULT_HEADER_EXTENSION.toStdString() << "\"\n\n";
  fcc << "#include \"" << GetName().toStdString() << "_Call" << DEFAULT_HEADER_EXTENSION.toStdString() << "\"\n\n";
  
  // Skeleton for main:
- InsertFile(fc,skb);
+ InsertFile(fc,skmb);
  
- // and now, some differences
- // For the single main:
- fc << "int main(int argc, char* argv[])\n{\n";
- fc << " if (argc<2)\n";
- fc << " {\n";
- fc << "  cerr << \"Usage: \" << argv[0] << \" <server_port> [other_arguments]\" << endl;\n";
- fc << "  exit(1);\n";
- fc << " }\n\n";
- fc << " unsigned short port=atoi(argv[1]);\n";
- fc << " if ((port<IPPORT_RESERVED+1) || (port>std::numeric_limits<unsigned short>::max()-1))\n";
- fc << " {\n";
- fc << "  cerr << \"Error: port must be between \" << IPPORT_RESERVED+1 << \" and \" << std::numeric_limits<unsigned short>::max()-1 << endl;\n";
- fc << "  exit(1);\n";
- fc << " }\n\n";
- fc << " Context theContext;\n";
- fc << " bool retsetargs;\n";
- fc << " if (argc>2)\n";
- fc << "  retsetargs=theContext.SetArgs(argc-2,argv+2);\n";
- fc << " else\n";
- fc << "  retsetargs=theContext.SetArgs(0,NULL);\n";
- fc << " if (!retsetargs)\n";
- fc << " {\n";
- fc << "  cerr << \"Error in Context.SetArgs. Check your additions to that function.\" << endl;\n";
- fc << "  exit(1);\n";
- fc << " }\n";
- fc << " theContext.InitializeContext();\n";
- fc << " if (theContext.GetError()!=NO_ERROR)\n";
- fc << " {\n";
- fc << "  cerr << \"Error in Context.InitializeContext(). Check your addtions to that function,\" << endl;\n";
- fc << "  cerr << \"Returned error is \" << theContext.ReadableError() << endl;\n";
- fc << "  exit(1);\n";
- fc << " }\n;";
-
- // For the multithreaded main:
- fcc << "// Function to exit from the thread correctly, which means let the parent know we are not using the assigned port any more,\n";
- fcc << "// releasing the access to the shared memory and returning null from the thread.\n";
- fcc << "void LeaveThreadCorrectly(pthread_mutex_t only_mutex,bool *used_ports,unsigned short place,ostream &errst)\n";
- fcc << "{\n";
- fcc << " if (ALLOW_PORT_REUSE)\n";
- fcc << " {\n";
- fcc << "  /* We are not using this port anymore, and this is signaled into the shared memory array of used ports\n";
- fcc << "     so that the superserver can assign it again.\n";
- fcc << "     Change is done with the precaution of using the mutex that protects the access to the used_ports array */\n";
- fcc << "  pthread_mutex_lock(&only_mutex);\n";
- fcc << "  used_ports[place]=false;\n";
- fcc << "  pthread_mutex_unlock(&only_mutex);\n";
- fcc << " }\n";
- fcc << " /* It is possible that we don't want to reuse the port, for testing purposes (an automatic test program needs to know\n";
- fcc << "    which the used ports will be in a predictable way). This is mainly for tests with JMeter. */\n\n";
- fcc << " // Whatever the case, this part of the shared memory is dettached from our user space\n";
- fcc << " if (used_ports!=nullptr)\n";
- fcc << " {\n";
- fcc << "  if (shmdt(used_ports)!=0)\n";
- fcc << "   errst << \"Error from thread with ID \" << pthread_self() << \": cannot detach the shared memory attached to know the used ports. Not fatal.\\n\";\n";
- fcc << " }\n";
- fcc << " if (SERVERDEB)\n";
- fcc << "  errst << \"Leaving thread with ID \" << pthread_self() << endl;\n";
- fcc << " errst.flush();\n";
- fcc << " pthread_exit(nullptr); // The thread is not joinable so it doesn't matter what we return\n";
- fcc << "}\n\n";
-
- fcc << "void *" << GetName().toStdString() << "Call(void *arg)\n{\n";
- fcc << " args_to_main *a = (args_to_main *)arg;\n\n";
- fcc << " unsigned short port = a->port;\n";
- fcc << " int shmid = a->sharedmem_id;\n";
- fcc << " unsigned short iniport=a->initial_port;\n";
- fcc << " unsigned short prange=a->port_range;\n\n";
- fcc << " if ((port<iniport) || (port>iniport+prange))\n {\n";
- fcc << "  cerr << \"Port \" << port << \": error. Port number not in [\" << iniport << \",\" << iniport+prange << \"]\";\n";
- fcc << "  pthread_exit(nullptr);\n }\n";
+ // Skeleton for thread
+ QStringList l1,l2;
+ l1.push_back("$PROJECT_NAME");
+ l2.push_back(GetName());
+ InsertFileWithSubsts(fcc,sktb,l1,l2);
  
- fcc << " Context theContext;\n";
- fcc << " theContext.SetPort(port);\n";
- fcc << " if (SERVERDEB)\n";
- fcc << "  theContext.SetOutletType(OUT_TO_FILE);\n";
- fcc << " else\n";
- fcc << "  theContext.SetOutletType(OUT_TO_CERR);\n\n";
- fcc << " theContext.SetArgs(a->newargc,a->newargv);\n";
- fcc << " theContext.InitializeContext();\n";
- fcc << " if (theContext.GetError()!=NO_ERROR)\n";
- fcc << " {\n";
- fcc << "  theContext.GetOutletStream() << \"Error in context creation. We can't execute the program. Review you additions to the Context() constructor.\" << endl;\n";
- fcc << "  LeaveThreadCorrectly(only_mutex,nullptr,port-iniport,theContext.GetOutletStream());\n";
- fcc << " }\n\n";
- 
- fcc << " ostringstream address_and_port_stream;\n";
- fcc << " address_and_port_stream << Poco::Net::DNS::thisHost().name() << \":\" << port;\n";
- fcc << " string address_and_port = address_and_port_stream.str();\n\n";
- 
- fcc << " pthread_t pthread_id=pthread_self();\n";
- fcc << " if (SERVERDEB)\n";
- fcc << " {\n";
- fcc << "  string prot;\n";
- fcc << "#ifdef SECURE_HTTP\n";
- fcc << "  prot=\"https\";\n";
- fcc << "#else\n";
- fcc << "  prot=\"http\";\n";
- fcc << "#endif\n\n";
- fcc << "  theContext.GetOutletStream() << \"*** Thread with ID \" << pthread_id << \" starts accepting requests of the form \" << prot << \"://\" << address_and_port << \" ***\\n\";\n";
- fcc << "  theContext.GetOutletStream().flush();\n";
- fcc << " }\n";
-
- fcc << " bool *used_ports = (bool *) shmat(shmid, NULL, 0);\n";
- fcc << " if ((void *)used_ports == (void *)(-1))\n";
- fcc << " {\n";
- fcc << "  theContext.GetOutletStream() << \"Error in shmat: the shared memory to know the currently available ports cannot be mapped to this thread's local address space. Exiting from the thread.\\n\";\n";
- fcc << "  LeaveThreadCorrectly(only_mutex,used_ports,port-iniport,theContext.GetOutletStream());\n";
- fcc << " }\n\n";
- 
- fcc << " bool retsetargs;\n";
- fcc << " if (a->newargc>0)\n";
- fcc << "  retsetargs=theContext.SetArgs(a->newargc,a->newargv);\n";
- fcc << " else\n";
- fcc << "  retsetargs=theContext.SetArgs(0,NULL);\n";
- fcc << " if (!retsetargs)\n";
- fcc << "  LeaveThreadCorrectly(only_mutex,used_ports,port-iniport,theContext.GetOutletStream());\n\n";
-
  // Now, for both again:
  QList<QString> Tl=GetTransitionNameList();
- fc  << " map<string,string (*)(Poco::Net::NameValueCollection &,string &,Context &)> tf;\n";
- fcc << " map<string,string (*)(Poco::Net::NameValueCollection &,string &,Context &)> tf;\n";
- fc  << "\n map<string,string> nf;\n";
- fcc <<"\n map<string,string> nf;\n";
+ ostringstream outcode;
+ outcode << " map<string,string (*)(Poco::Net::NameValueCollection &,string &,Context &)> tf;\n";
+ outcode << "\n map<string,string> nf;\n";
  for (int i=0;i<Tl.size();i++)
- {
-  fc  << " nf[\"" << GetTransitionInitialState(Tl[i]).toStdString() << "\"]=\"Wrapper_Tr_" << Tl[i].toStdString() << "\";\n";
-  fcc << " nf[\"" << GetTransitionInitialState(Tl[i]).toStdString() << "\"]=\"Wrapper_Tr_" << Tl[i].toStdString() << "\";\n";
- }
- fc  << "\n";
- fcc << "\n";
+  outcode << " nf[\"" << GetTransitionInitialState(Tl[i]).toStdString() << "\"]=\"Wrapper_Tr_" << Tl[i].toStdString() << "\";\n";
+ outcode << endl;
  for (int i=0;i<Tl.size();i++)
- {
-  fc  << " tf[\"" << GetTransitionInitialState(Tl[i]).toStdString() << "\"]=Wrapper_Tr_" << Tl[i].toStdString() << ";\n";
-  fcc << " tf[\"" << GetTransitionInitialState(Tl[i]).toStdString() << "\"]=Wrapper_Tr_" << Tl[i].toStdString() << ";\n";
- }
- fc  << "\n"; 
- fcc << "\n";
- 
- fc  << "\n string this_state=\"" << GetInitState().toStdString() << "\";\n";
- fcc << "\n string this_state=\"" << GetInitState().toStdString() << "\";\n";
- fc  << " string page = State_" << GetInitState().toStdString() << "(";
- fcc << " string page = State_" << GetInitState().toStdString() << "(";
- 
+  outcode << " tf[\"" << GetTransitionInitialState(Tl[i]).toStdString() << "\"]=Wrapper_Tr_" << Tl[i].toStdString() << ";\n";
+ outcode << endl;
+ outcode << "\n string this_state=\"" << GetInitState().toStdString() << "\";\n";
+ outcode << " string page = State_" << GetInitState().toStdString() << "(";
  inith.replace(DEFAULT_CPP_EXTENSION,"_call"+DEFAULT_CPP_EXTENSION);
  QString call=FileAsQString(inith);
  if (HasContent(call))
- {
-  fc  << call.toStdString() << ",";
-  fcc << call.toStdString() << ",";
- }
- fc  << "theContext.GetIndentString());\n\n";
- fcc << "theContext.GetIndentString());\n\n";
+  outcode << call.toStdString() << ",";
+ outcode << "theContext.GetIndentString());\n\n";
+  
+ fc  << outcode.str();
+ fcc << outcode.str();
  
  // The rest of the files are done inserting a different skeleton for each one
  InsertFile(fc,ska);
@@ -1897,14 +1722,8 @@ void Project::GenServer(QString MainHeaderServer,QString MainSourceServer)
  
  // and then, the source, but fortunately it is almost invariant and can be copied as skeleton
  QString skser=INST_DIR+MAIN_SERVER;
- if (!FileAccessible(skser))
- {
-  QVector<QString> e;
-  e.push_back(tr("The skeleton file %1 does not exists. Please, install the emintweb program correctly"));
-  e.push_back(skser);
-  ErrWarn(true,e);
-  exit(1);
- }
+ ExitIfNotAccessible(skser);
+ 
  ofstream fcsc;
  if (!OpenToWrite(MainSourceServer,fcsc))
   return;

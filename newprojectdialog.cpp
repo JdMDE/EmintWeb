@@ -264,31 +264,8 @@ void NewProjectDialog::DoAddLibDir()
  }
 }
 
-bool NewProjectDialog::AlterProjectContent(QString pfile,bool kill_st_tr)
+void NewProjectDialog::AlterProjectContent(QString pfile,bool kill_st_tr)
 {
- QString pd=ePDir->text();
- 
- // Project directory must be an absolute path (i.e.: begin with /) and, if it does end with /, we add it for convenience
- if (!pd.startsWith(PLATFORM_DIRSLASH))
- {
-  QMessageBox::warning(this,tr("Change project dir"),tr("The project dirctory is not an absolute path. Please, change it."),QMessageBox::Ok);
-  return false;
- }
- if (!pd.endsWith(PLATFORM_DIRSLASH))
-  pd += PLATFORM_DIRSLASH;
- 
- if (!QDir(pd).exists())
- {
-  int ret=QMessageBox::question(this,tr("Create dir"),tr("Directory %1 does not exist.\nDo you want to create it?").arg(pd),QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
-  if (ret==QMessageBox::Yes)
-  {
-   if (!QDir().mkdir(pd))
-   {
-    QMessageBox::warning(this,tr("Directory not created"),tr("Directory %1 could not be created. Permissions problem?").arg(pd),QMessageBox::Ok);
-    return false;
-   }
-  }
- } 
  project->Reset(eName->text(),
                 cbPModeFlag->isChecked(),
                 ePEMFile->text(),
@@ -296,7 +273,7 @@ bool NewProjectDialog::AlterProjectContent(QString pfile,bool kill_st_tr)
                 ePEMKeySize->text(),
                 eDHFile->text(),
                 pfile,
-                pd,
+                ePDir->text(),
                 eHSub->text(),
                 eCSub->text(),
                 eComments->document()->toPlainText(),
@@ -321,22 +298,20 @@ bool NewProjectDialog::AlterProjectContent(QString pfile,bool kill_st_tr)
  
  project->NotEmpty();
  project->Modified();
- 
- return true;
 }
 
 void NewProjectDialog::DoProjectModification()
 {
- if (AlterProjectContent(project->GetPFile(),false))
-  popup.done(0);
+ AlterProjectContent(project->GetPFile(),false);
+ popup.done(0);
 }
 
 void NewProjectDialog::DoProjectCreation()
 {
  QString pfile=eName->text()+".emw";
 
- if (AlterProjectContent(pfile,true))
-  popup.done(0);
+ AlterProjectContent(pfile,true);
+ popup.done(0);
 }
 
 void NewProjectDialog::DoProjectCancel()

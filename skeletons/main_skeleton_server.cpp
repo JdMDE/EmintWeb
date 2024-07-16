@@ -1,7 +1,10 @@
-// This is a global mutex to protect the shared memory area that will contain the array of used ports.
-// The main program and all the theads will have read/write access to that array so the mutex is needed to arbitrate the access
-// We call it 'only' because we don't need any other by now.
+// This is a global mutex to protect the shared memory area that will contain the array of used ports as index of thread_info structures (see header of this file)
+// The main program and all the theads will have read/write access to that array so the mutex is needed to arbitrate the access. Apart from the mutex, all the
+// threads need to know the shared memory identifier, so it must be global, too. It cannot be passed because a signal handler needs it. The same happens with port_extension,
+// the total maximum number of allowed ports.
 pthread_mutex_t only_mutex;
+int shmid;
+int port_extension;
 
 // Function to write sensible descriptions of the errors (either to cerr or to an opened file stream)
 void AnnounceError(ServerErrors error_type,string err_desc,unsigned short port,ostream &errst,int len,int exp_len)
@@ -357,7 +360,6 @@ string ProcessArgs(int argc,char *argv[],string &dname,unsigned short &entry_por
   exit(1);
  }
  
- 
  string appname=RecoverAppName(string(argv[0]));
 
  dname = string(argv[1]);
@@ -399,17 +401,40 @@ string ProcessArgs(int argc,char *argv[],string &dname,unsigned short &entry_por
  return appname;
 }
 
+// This thread will monitor periodically (every 30 seconds) if any thread has received a SIGABRT signal
+// so it is running in an inifinite loop. We can do anything, except warn the user (see the message...).
+// This threa receives the pointer to the array of thread_info structures
+void *WatchdogThread(void *arg)
+{
+ thread_info *used_ports = (thread_info *) shmat(shmid,0,0);
+ while (true)
+ {
+  for (int place=0; place<port_extension; place++)
+   if (used_ports[place].state & RECEIVED_ABRT)
+   {
+    cerr << "WARNING: thread with identifier " << used_ports[place].thpid << " that was running associated to port INITIAL_PORT+" << place << " has received an ABRT signal.\n";
+    cerr << "Unfortunately, we can't do much about that. The thread is sleeping and will die when the whole server dies.\n";
+    cerr << "A call to pthread_exit inside the thread after reception of SIGABRT would kill the whole server so we prefer not to do it.\n";
+    cerr << "But check the program and stop it as soon as possible, since this error could have affected other threads.\n";
+    pthread_mutex_lock(&only_mutex);
+    used_ports[place].state = SLEEPING;
+    pthread_mutex_unlock(&only_mutex);
+   }
+  sleep(30); 
+ }
+}
+
 int main(int argc,char *argv[])
 {
- unsigned short iniport,finport,range,entry_port;
+ unsigned short iniport,finport,entry_port;
  string dname;
  
  string appname=ProcessArgs(argc,argv,dname,entry_port,iniport,finport);
- range=finport-iniport;
+ port_extension=finport-iniport;
  
- // Request an array of range bytes (boolean marks) that will mark which ports are used at each moment)
- // as a shared memory segment, whose identifier the threads will know.
- int shmid = shmget(IPC_PRIVATE,range,0777|IPC_CREAT);
+ // Request an array of port_extension thread_info structures that will mark which ports are used at each moment
+ // and the thread id's of its associated thread as a shared memory segment, whose identifier the threads will know.
+ shmid = shmget(IPC_PRIVATE,port_extension*sizeof(thread_info),0777|IPC_CREAT);
   
  // The former array could be altered by the main program and by its threads, so we declare a mutex to protect it
  if (pthread_mutex_init(&only_mutex, NULL) != 0)
@@ -436,17 +461,28 @@ int main(int argc,char *argv[])
  else
   new_args.newargv = nullptr;
 
- // The other fields of the strcture are filled here with appropriate values
- new_args.sharedmem_id = shmid;
+ // The other fields of the structure are filled here with appropriate values
  new_args.initial_port = iniport;
- new_args.port_range = range;
  
  // This is the buffer in which the request sent by the user as a URL will be stored, but it will not be used.
  char *buf=new char[BUFFER_SIZE+1];
  
  // This shared memory is attached to an address in our address space
- bool *used_ports = (bool *) shmat(shmid,0,0);
- 
+ // and properly initialized
+ thread_info *used_ports = (thread_info *) shmat(shmid,0,0);
+ for (int i=0; i<port_extension; i++)
+  used_ports[i].state=AVAILABLE;
+  
+ // We can launch now the watchdog thread
+ pthread_t watchdog_pthid;
+ if (pthread_create(&watchdog_pthid,nullptr,WatchdogThread,(void *)used_ports)!=0)
+ {
+  cerr << "ERROR: cannot create the watchdog thread. This is fatal. Sorry.\n";
+  exit(1);
+ }
+ if (SERVERDEB)
+  cout << "Watchdog thread with identifier " << watchdog_pthid << " launched.\n";
+  
  // Now, the code to manage the interaction through sockets, either with or without SSL.
 #ifdef SECURE_HTTP
  Poco::Net::Context::Ptr ptr_ctx=PrepareSSLContext(nullptr,cerr);
@@ -504,7 +540,6 @@ int main(int argc,char *argv[])
 
  unsigned short newport,newpos;
  pthread_t pidt;
- srand(time(nullptr));
  
  // Let's create a thread argument for all the threds that will be created. The reason, instead
  // of using the default values, it that we want to make the threads dettached so when they finish,
@@ -524,6 +559,9 @@ int main(int argc,char *argv[])
 #endif
  }
  cout.flush();
+ 
+ // This is for the case of randomly assigned ports, if we decide to use it
+ srand(time(nullptr));
  
  do
  {
@@ -625,30 +663,31 @@ int main(int argc,char *argv[])
     cout << "Main server receives HTTP resquest with URI '" << URI << "', as expected.\n";
   
   // Now, let's choose the next unused port in the range.
-  // The array of booleans of used parts has 'range' items where the first one represents the first port in the range, and so on.
-  // This array is changed here, marking as true the fact we are using a new port, and by every thread marking as false just before leaving
-  // to announce that it does not need the port anymore. Since the array is altered by this main program and by the threads, it has
-  // to be protected by a mutex.
+  // The array of pthread_info structures with the used parts has 'port_extension' items where the first one represents the first port in the range, and so on.
+  // This array is changed here, marking the fact we are using a new port, and by every thread marking as available just before leaving
+  // to announce that it does not need the port anymore, unless the thread receives a signal, which is managed to mark the array appropriately.
+  // Since the array is altered by this main program and by the threads, it has to be protected by a mutex.
   pthread_mutex_lock(&only_mutex);
   
   // Choose a new position in the array which is not true (i.e.: port used)
   // For sequentially chosen ports:
   newpos=0;
-  while (newpos<range && used_ports[newpos])
+  while (newpos<port_extension && used_ports[newpos].state!=AVAILABLE)
    newpos++;  
   // For randomly assigned ports:
   //do
   //{
-  // newpos=(unsigned short)(float(rand())*range/RAND_MAX);
+  // newpos=(unsigned short)(float(rand())*port_extension/RAND_MAX);
   //}
   //while (used_ports[newpos]);
    
-  if (newpos<range)
-   used_ports[newpos]=true;
+  // Well, the thread is not yet running, but it will be immediately...
+  if (newpos<port_extension)
+   used_ports[newpos].state=RUNNING;
   
   pthread_mutex_unlock(&only_mutex);
     
-  if (newpos>=range)
+  if (newpos>=port_extension)
   {
    cerr << "From main server: NO PORTS LEFT!!! ";
    if (SendBusyPage(entry_port,sts,cerr))
@@ -697,11 +736,20 @@ int main(int argc,char *argv[])
        }
        thread_created_correctly=false;
       }
+      else
+      {
+       // Here the thread has been created correctly. Let's take note of its identifier.
+       pthread_mutex_lock(&only_mutex);
+       // Field state was initialized to RUNNING before. Here we only have to update the thread identifier
+       used_ports[newpos].thpid=pidt;
+       pthread_mutex_unlock(&only_mutex);
+      }
      }
      if (!thread_created_correctly)
      {
+      // If due to the failure of any of the former checks, the thread has not finally been created, let's declare its port as AVAILABLE
       pthread_mutex_lock(&only_mutex);
-      used_ports[newpos]=false;
+      used_ports[newpos].state=AVAILABLE;
       pthread_mutex_unlock(&only_mutex);
      }
     }
@@ -709,7 +757,7 @@ int main(int argc,char *argv[])
    else
    {                                             // If the redirection page cannot be sent, the thread is not created and the port is decleared as available
     pthread_mutex_lock(&only_mutex);
-    used_ports[newpos]=false;
+    used_ports[newpos].state=AVAILABLE;
     pthread_mutex_unlock(&only_mutex);
    }
   }

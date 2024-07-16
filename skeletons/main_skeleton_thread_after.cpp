@@ -54,7 +54,8 @@
    theContext.GetOutletStream() << e << "\nWe don't know how to deal with this dirty error. You will have to wait for a while until the system decides you can use the port again...\n";
   else
    theContext.GetOutletStream() << "It might be due to the binding of the socket ifself or to the fact of setting it as non-blocking, keep-alive and not-reuse-port.\n" << e << endl;
-  LeaveThreadCorrectly(only_mutex,used_ports,port-iniport,theContext.GetOutletStream());
+  // Since the clean-up function was installed, calling pthread_exit will call it automatically.
+  pthread_exit(nullptr);
  }
  /*
  catch (Poco::TimeoutException& exc2)
@@ -84,7 +85,7 @@
  {
   theContext.GetOutletStream() << "Received TimeoutException from the POCO libraries after call to listen with queue size of " << queue_size << " in thread of port " << port << endl;
   theContext.GetOutletStream() << exc2.displayText() << endl;
-  LeaveThreadCorrectly(only_mutex,used_ports,port-iniport,theContext.GetOutletStream());
+  LeaveThreadCorrectly(used_ports,port-iniport,&(theContext.GetOutletStream()),false);
  }
  */
  if (listener.getError())
@@ -100,10 +101,7 @@
   theContext.GetOutletStream() << "Starting main loop...\n";
  unsigned long loopcounter=0;
  do
- {
-  if (SERVERDEB)
-   theContext.GetOutletStream() << "Loop " << loopcounter << endl;
-   
+ {  
   // Socket is set to accept connections and return a socket in connected state
 #ifdef SECURE_HTTP
   Poco::Net::SecureStreamSocket sts;
@@ -225,6 +223,9 @@
   // This is just to give info about the received URI
   if (SERVERDEB && URI.find("favicon")==string::npos)
   {
+   if (SERVERDEB)
+    theContext.GetOutletStream() << "Loop " << loopcounter << endl;
+    
    theContext.GetOutletStream() << "Received request with URI " << URI;
    if (FormWithIVars.size() > 0)
    {
@@ -279,7 +280,7 @@
    if (this_state=="")
    {
     theContext.GetOutletStream() << "Error: variable this_state is empty ???\n";
-    LeaveThreadCorrectly(only_mutex,used_ports,port-iniport,theContext.GetOutletStream());  
+    // Since the clean-up function was installed, calling pthread_exit will call it automatically.  
     pthread_exit(nullptr);
    }
    
@@ -306,7 +307,7 @@
     catch (const std::exception &e)
     {
      theContext.GetOutletStream() << "Error: The former exception happened in main server when executing the function tf[" << this_state << "]\n";    
-     LeaveThreadCorrectly(only_mutex,used_ports,port-iniport,theContext.GetOutletStream());  
+     // Since the clean-up function was installed, calling pthread_exit will call it automatically.  
      pthread_exit(nullptr);  
     }
        
@@ -332,7 +333,7 @@
     {
      theContext.GetOutletStream() << "Error: The former exception happened in main server when modifying the page:\n==========\n";
      theContext.GetOutletStream() << page << "\n==========\n";
-     LeaveThreadCorrectly(only_mutex,used_ports,port-iniport,theContext.GetOutletStream());   
+     // Since the clean-up function was installed, calling pthread_exit will call it automatically.  
      pthread_exit(nullptr);
     }
        
@@ -350,6 +351,10 @@
  if (SERVERDEB)
   theContext.GetOutletStream() << "Process ends.\n";
  
- return 0;
+ pthread_cleanup_pop(0);
+ 
+ // LeaveThreadCorrectlyOneArg has just been uninstalled, so we must call LeaveThreadCorrectly explicitly and exit from the thread afterwards
+ LeaveThreadCorrectly(used_ports,port-iniport,&(theContext.GetOutletStream()),false);
+ pthread_exit(nullptr);
 }
 

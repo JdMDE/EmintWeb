@@ -215,8 +215,10 @@ class Project
   QStringList GetAdditionalElements(QStringList Add,QString prepend,QString sep);
   QString GetAdditionalElementsAsString(QStringList Add,QString prepend,QString sep);
   
+  void ExitIfNotAccessible(QString fname);
   void InsertFile(ofstream &f,QString fname);
   QString FileAsQString(QString fname);
+  void InsertFileWithSubsts(ofstream &f,QString fname,QStringList to_search,QStringList to_replace);
   bool HasContent(QString r);
   QString NameWithoutPath(QString s);
 
